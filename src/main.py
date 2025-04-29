@@ -78,14 +78,26 @@ The template uses {{code}} and {{proof}} placeholders. I need:
 2. ONLY the proof to replace {{proof}} - just the proof body
 
 For proofs, remember:
-- Don't use period (.) or bullet points like (· or •) at the beginning of lines in the proof
-- For most simple cases, use 'simp' or 'rfl' tactics
-- For cases that need analysis, use:
-  cases h : expr with
-  | case1 => ... 
-  | case2 => ...
-- Don't use 'focus' or 'by' in your proofs
-- Always ensure your proof has no unexpected syntax
+- Keep proofs simple and direct - use 'simp' or 'rfl' when possible
+- For equality proofs of simple expressions, 'rfl' is often sufficient
+- For Boolean operations or specifications, 'simp' is usually best
+- When case analysis is needed, use the pattern:
+  split
+  case left => 
+    ... tactics ...
+  case right =>
+    ... tactics ...
+- For proofs that require analyzing Int or Nat, use:
+  apply Iff.intro
+  ... forward direction proof ...
+  ... backward direction proof ...
+- Avoid using period (.) or bullet points (·, •) at the beginning of lines
+- Don't use 'unfold' with function names that aren't explicitly defined
+- Don't use 'by_cases' nested inside other tactics
+- For proving properties about Array operations:
+  * Use 'constructor' to prove conjunctions
+  * For size properties, use 'simp [Array.size_map]' or similar
+  * For element properties, use 'intro i hi' and then 'simp [Array.getElem_map]'
 
 Format your answer EXACTLY like this:
 CODE:
@@ -96,29 +108,67 @@ PROOF:
     
     # Examples of successful proofs to help guide the LLM
     example_proofs = """
-Example 1:
+Example 1: Identity function
 Function: def ident (x : Nat) : Nat
 Specification: result = x
 CODE: x
 PROOF: rfl
 
-Example 2:
+Example 2: Divisibility check
 Function: def isDivisibleBy11 (n : Int) : Bool
 Specification: n % 11 = 0
 CODE: n % 11 = 0
 PROOF: simp
 
-Example 3:
+Example 3: Multiplication
 Function: def multiply (a b : Int) : Int
 Specification: result = a * b
 CODE: a * b
 PROOF: rfl
 
-Example 4:
+Example 4: Cube surface area
 Function: def cubeSurfaceArea (size : Int) : Int
 Specification: result = 6 * size * size
 CODE: 6 * size * size
 PROOF: rfl
+
+Example 5: Minimum of two numbers
+Function: def myMin (a b : Int) : Int
+Specification: (result ≤ a ∧ result ≤ b) ∧ (result = a ∨ result = b)
+CODE: if a ≤ b then a else b
+PROOF: 
+split
+case left => 
+  by_cases h : a ≤ b
+  case pos => 
+    simp [h]
+    constructor
+    exact ⟨h, le_refl a⟩
+    exact Or.inl rfl
+  case neg => 
+    simp [h]
+    constructor
+    exact ⟨le_refl b, le_of_not_le h⟩
+    exact Or.inr rfl
+case right =>
+  by_cases h : a ≤ b
+  case pos => 
+    simp [h]
+    exact Or.inl rfl
+  case neg => 
+    simp [h]
+    exact Or.inr rfl
+
+Example 6: Last digit
+Function: def lastDigit (n : Nat) : Nat
+Specification: 0 ≤ result ∧ result < 10 ∧ result = n % 10
+CODE: n % 10
+PROOF:
+constructor
+· exact Nat.zero_le (n % 10)
+· constructor
+  · exact Nat.mod_lt n (by decide : 0 < 10)
+  · rfl
 """
     
     user_prompt = f"""Problem Description:
@@ -186,6 +236,18 @@ Remember to format your answer using CODE: and PROOF: markers.
             print("Verification failed. Asking LLM for correction...")
             # Add assistant's response and user's feedback for the next iteration
             messages.append({"role": "assistant", "content": response})
+            
+            # More specific guidance based on the error message
+            error_guidance = "Use simple proof tactics like 'simp', 'rfl', 'exact', etc."
+            if "tactic 'unfold' failed" in verification_result:
+                error_guidance = "Don't use 'unfold' with function names that aren't defined in the context."
+            elif "application type mismatch" in verification_result:
+                error_guidance = "Check argument types carefully in your proof. Make sure they match what the tactics expect."
+            elif "unsolved goals" in verification_result:
+                error_guidance = "Your proof doesn't completely solve the goal. Be more explicit in your reasoning."
+            elif "array" in verification_result.lower() or "Array" in verification_result:
+                error_guidance = "For Array properties, use 'constructor' to split the proof and handle size and elements separately."
+            
             messages.append({"role": "user", "content": f"""Your solution had errors:
 {verification_result}
 
@@ -194,7 +256,7 @@ Please fix the code and proof. Remember:
 2. Do not include function definitions or extra formatting
 3. Avoid using dots (.) at the beginning of lines in the proof
 4. Do not use nested syntax like 'by_cases h' inside a case
-5. Use simple proof tactics like 'simp', 'rfl', 'exact', etc."""})
+5. {error_guidance}"""})
 
         retries += 1
         if retries == max_retries:
