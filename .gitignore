@@ -1,9 +1,39 @@
-temp_project/
+# Python virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Lean specific
 .lake/
 submission.zip
 lean_playground/*
 !lean_playground/.gitkeep
 
-__pycache__/
-.venv/
 .tasks_copy/
